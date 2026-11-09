@@ -1,0 +1,67 @@
+name: Publish Extension (VS Code Marketplace & Open VSX)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build & Publish to VS Code Marketplace and Open VSX
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies & compile
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Package VSIX
+        run: npx @vscode/vsce package
+
+      - name: Upload VSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-git-message-vsix
+          path: '*.vsix'
+
+      - name: Create GitHub Release (on Tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.vsix'
+          generate_release_notes: true
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::warning::VSCE_PAT secret is not configured yet. Skipping VS Code Marketplace publish."
+          else
+            npx @vscode/vsce publish --packagePath *.vsix -p "$VSCE_PAT"
+          fi
+
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::warning::OVSX_PAT secret is not configured yet. Skipping Open VSX publish."
+          else
+            PUBLISHER=$(node -p "require('./package.json').publisher")
+            npx -y ovsx create-namespace "$PUBLISHER" -p "$OVSX_PAT" || true
+            npx -y ovsx publish *.vsix -p "$OVSX_PAT"
+          fi

@@ -1,0 +1,232 @@
+{
+  "name": "ai-git-message",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
+  "version": "1.0.0",
+  "publisher": "kiritoko1029",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://github.com/kiritoko1029/ai-git-message#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiritoko1029/ai-git-message.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kiritoko1029/ai-git-message/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "openai",
+    "anthropic",
+    "claude",
+    "responses",
+    "conventional-commits",
+    "gitmoji"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiGitMessage.generate",
+        "title": "%command.generate%",
+        "category": "AI Git Message",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "aiGitMessage.stopGenerate",
+        "title": "%command.stopGenerate%",
+        "category": "AI Git Message",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "aiGitMessage.generateWithTemplate",
+        "title": "%command.generateWithTemplate%",
+        "category": "AI Git Message",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "aiGitMessage.selectTemplate",
+        "title": "%command.selectTemplate%",
+        "category": "AI Git Message",
+        "icon": "$(book)"
+      },
+      {
+        "command": "aiGitMessage.selectModel",
+        "title": "%command.selectModel%",
+        "category": "AI Git Message",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "aiGitMessage.addProvider",
+        "title": "%command.addProvider%",
+        "category": "AI Git Message",
+        "icon": "$(add)"
+      },
+      {
+        "command": "aiGitMessage.openDashboard",
+        "title": "%command.openDashboard%",
+        "category": "AI Git Message",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "aiGitMessage.generate",
+          "when": "scmProvider == git && !aiGitMessage.isGenerating",
+          "group": "navigation@-10"
+        },
+        {
+          "command": "aiGitMessage.stopGenerate",
+          "when": "scmProvider == git && aiGitMessage.isGenerating",
+          "group": "navigation@-10"
+        },
+        {
+          "command": "aiGitMessage.generateWithTemplate",
+          "when": "scmProvider == git",
+          "group": "2_aiGitMessage@1"
+        },
+        {
+          "command": "aiGitMessage.selectTemplate",
+          "when": "scmProvider == git",
+          "group": "2_aiGitMessage@2"
+        },
+        {
+          "command": "aiGitMessage.selectModel",
+          "when": "scmProvider == git",
+          "group": "2_aiGitMessage@3"
+        },
+        {
+          "command": "aiGitMessage.openDashboard",
+          "when": "scmProvider == git",
+          "group": "2_aiGitMessage@4"
+        }
+      ],
+      "scm/resourceGroup/context": [
+        {
+          "command": "aiGitMessage.generate",
+          "when": "scmProvider == git && (scmResourceGroup == index || scmResourceGroup == workingTree) && !aiGitMessage.isGenerating",
+          "group": "2_aiGitMessage@1"
+        },
+        {
+          "command": "aiGitMessage.generateWithTemplate",
+          "when": "scmProvider == git && (scmResourceGroup == index || scmResourceGroup == workingTree)",
+          "group": "2_aiGitMessage@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "aiGitMessage.activeProviderId": {
+          "type": "string",
+          "default": "",
+          "description": "%config.activeProviderId%"
+        },
+        "aiGitMessage.activeModelId": {
+          "type": "string",
+          "default": "",
+          "description": "%config.activeModelId%"
+        },
+        "aiGitMessage.activeTemplateId": {
+          "type": "string",
+          "default": "conventional",
+          "description": "%config.activeTemplateId%"
+        },
+        "aiGitMessage.commitLanguage": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "zh",
+            "en"
+          ],
+          "enumDescriptions": [
+            "%config.commitLanguage.auto%",
+            "%config.commitLanguage.zh%",
+            "%config.commitLanguage.en%"
+          ],
+          "default": "auto",
+          "description": "%config.commitLanguage%"
+        },
+        "aiGitMessage.askTemplateBeforeGenerate": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.askTemplateBeforeGenerate%"
+        },
+        "aiGitMessage.diffScope": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "staged",
+            "all"
+          ],
+          "enumDescriptions": [
+            "%config.diffScope.auto%",
+            "%config.diffScope.staged%",
+            "%config.diffScope.all%"
+          ],
+          "default": "auto",
+          "description": "%config.diffScope%"
+        },
+        "aiGitMessage.streamOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.streamOutput%"
+        },
+        "aiGitMessage.maxDiffLines": {
+          "type": "number",
+          "default": 1500,
+          "description": "%config.maxDiffLines%"
+        },
+        "aiGitMessage.customInstructions": {
+          "type": "string",
+          "default": "",
+          "description": "%config.customInstructions%"
+        },
+        "aiGitMessage.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showStatusBar%"
+        },
+        "aiGitMessage.providers": {
+          "type": "array",
+          "default": [],
+          "description": "%config.providers%"
+        },
+        "aiGitMessage.customTemplates": {
+          "type": "array",
+          "default": [],
+          "description": "%config.customTemplates%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish:vscode": "vsce publish",
+    "publish:openvsx": "npx -y ovsx publish",
+    "publish:all": "npm run publish:vscode && npm run publish:openvsx"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.26.0",
+    "typescript": "^5.4.0"
+  }
+}
