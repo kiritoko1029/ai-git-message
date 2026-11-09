@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
@@ -20,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies & compile
@@ -29,7 +30,7 @@ jobs:
           npm run compile
 
       - name: Package VSIX
-        run: npx @vscode/vsce package
+        run: npx -y @vscode/vsce@latest package
 
       - name: Upload VSIX Artifact
         uses: actions/upload-artifact@v4
@@ -44,15 +45,15 @@ jobs:
           files: '*.vsix'
           generate_release_notes: true
 
-      - name: Publish to VS Code Marketplace
+      - name: Publish to VS Code Marketplace (Trusted Publishing OIDC)
         continue-on-error: true
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          if [ -z "$VSCE_PAT" ]; then
-            echo "::warning::VSCE_PAT secret is not configured yet. Skipping VS Code Marketplace publish."
+          if [ -n "$VSCE_PAT" ]; then
+            npx -y @vscode/vsce@latest publish --packagePath *.vsix -p "$VSCE_PAT"
           else
-            npx @vscode/vsce publish --packagePath *.vsix -p "$VSCE_PAT"
+            npx -y @vscode/vsce@latest publish --packagePath *.vsix --oidc
           fi
 
       - name: Publish to Open VSX Registry
