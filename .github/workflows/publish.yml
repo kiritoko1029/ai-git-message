@@ -46,14 +46,16 @@ jobs:
           generate_release_notes: true
 
       - name: Publish to VS Code Marketplace (Trusted Publishing OIDC)
-        continue-on-error: true
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          FALLBACK_VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          if [ -n "$VSCE_PAT" ]; then
-            npx -y @vscode/vsce@latest publish --packagePath *.vsix -p "$VSCE_PAT"
+          if npx -y @vscode/vsce@latest publish --packagePath *.vsix --oidc --skip-duplicate; then
+            echo "Successfully published to VS Code Marketplace via Trusted Publishing (OIDC)."
+          elif [ -n "$FALLBACK_VSCE_PAT" ]; then
+            echo "::warning::OIDC Trusted Publishing failed, falling back to VSCE_PAT..."
+            npx -y @vscode/vsce@latest publish --packagePath *.vsix -p "$FALLBACK_VSCE_PAT" --skip-duplicate
           else
-            npx -y @vscode/vsce@latest publish --packagePath *.vsix --oidc
+            exit 1
           fi
 
       - name: Publish to Open VSX Registry
@@ -66,5 +68,5 @@ jobs:
           else
             PUBLISHER=$(node -p "require('./package.json').publisher")
             npx -y ovsx create-namespace "$PUBLISHER" -p "$OVSX_PAT" || true
-            npx -y ovsx publish *.vsix -p "$OVSX_PAT"
+            npx -y ovsx publish *.vsix -p "$OVSX_PAT" --skip-duplicate
           fi
