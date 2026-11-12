@@ -604,40 +604,6 @@ export class DashboardPanel {
       margin: 0;
     }
 
-    .preset-buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .preset-btn {
-      padding: 6px 8px;
-      border-radius: var(--radius-sm);
-      border: 1px dashed var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-      background: var(--bg-elevated);
-      color: var(--text-main);
-      font-size: 11.5px;
-      cursor: pointer;
-      text-align: left;
-      transition: border-color 0.15s;
-    }
-
-    .preset-btn:hover {
-      border-style: solid;
-      border-color: var(--vscode-focusBorder, var(--accent));
-    }
-
-    .preset-btn strong {
-      display: block;
-      font-size: 11.5px;
-    }
-
-    .preset-btn span {
-      font-size: 10.5px;
-      color: var(--text-muted);
-    }
-
     .provider-list {
       display: flex;
       flex-direction: column;
@@ -1104,15 +1070,8 @@ export class DashboardPanel {
         <div class="sidebar-panel">
           <div class="panel-header">
             <h3 class="panel-title">${isZh ? '已配置的供应商' : 'Configured Providers'}</h3>
-          </div>
-          <div class="preset-buttons">
-            <button class="preset-btn" id="btnPresetOpenAI">
-              <strong>+ OpenAI Response</strong>
-              <span>/v1/responses</span>
-            </button>
-            <button class="preset-btn" id="btnPresetAnthropic">
-              <strong>+ Anthropic Message</strong>
-              <span>/v1/messages</span>
+            <button class="btn btn-secondary btn-sm" type="button" id="btnNewProvider" style="display:none;">
+              + ${isZh ? '新增' : 'New'}
             </button>
           </div>
           <div class="provider-list" id="providerListContainer"></div>
@@ -1192,6 +1151,9 @@ export class DashboardPanel {
 
               <div class="input-row" style="margin-bottom: 6px;">
                 <input type="text" class="input" id="modelSearchInput" placeholder="🔍 ${isZh ? '搜索过滤模型列表...' : 'Filter models...'}" />
+                <button class="btn btn-secondary btn-sm" type="button" id="btnClearModels" style="display:none;">
+                  ${isZh ? '清空' : 'Clear'}
+                </button>
               </div>
 
               <div class="models-chips" id="modelsChipsContainer"></div>
@@ -1228,8 +1190,8 @@ export class DashboardPanel {
             🌐 ${isZh ? '模板与生成语言:' : 'Commit Output Language:'}
           </span>
           <div class="segmented-group" id="langSegmentedGroup">
-            <button class="segmented-btn" data-lang="zh">中文</button>
-            <button class="segmented-btn" data-lang="en">English</button>
+            <button class="segmented-btn ${isZh ? 'active' : ''}" data-lang="zh">中文</button>
+            <button class="segmented-btn ${!isZh ? 'active' : ''}" data-lang="en">English</button>
           </div>
           <span style="font-size:11.5px; color:var(--text-muted);">
             ${isZh ? '（切换后所有内置模板示例与 AI 生成结果自动切换为对应语言）' : '(Switches template examples and AI output language)'}
@@ -1391,6 +1353,8 @@ export class DashboardPanel {
     let selectedProtocol = 'openai-responses';
     let currentProviderModels = [];
     let modelSearchKeyword = '';
+    let hasInitializedForm = false;
+    let pendingProviderSave = false;
 
     // Tab 切换
     document.querySelectorAll('.nav-tab').forEach((btn) => {
@@ -1474,28 +1438,28 @@ export class DashboardPanel {
 
     document.getElementById('providerBaseUrlInput').addEventListener('input', updateEndpointPreview);
 
-    document.getElementById('btnPresetOpenAI').addEventListener('click', () => {
+    function resetNewProviderForm() {
       loadProviderIntoForm({
         id: '',
-        name: 'OpenAI Response',
+        name: '',
         protocol: 'openai-responses',
         baseUrl: 'https://api.openai.com/v1',
         apiKey: '',
-        models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'o4-mini'],
-        defaultModel: 'gpt-4.1'
+        models: [],
+        defaultModel: ''
       });
+    }
+
+    document.getElementById('btnNewProvider').addEventListener('click', () => {
+      resetNewProviderForm();
     });
 
-    document.getElementById('btnPresetAnthropic').addEventListener('click', () => {
-      loadProviderIntoForm({
-        id: '',
-        name: 'Anthropic Claude',
-        protocol: 'anthropic-messages',
-        baseUrl: 'https://api.anthropic.com/v1',
-        apiKey: '',
-        models: ['claude-sonnet-4-20250514', 'claude-3-7-sonnet-latest', 'claude-3-5-haiku-latest'],
-        defaultModel: 'claude-sonnet-4-20250514'
-      });
+    document.getElementById('btnClearModels').addEventListener('click', () => {
+      currentProviderModels = [];
+      modelSearchKeyword = '';
+      document.getElementById('modelSearchInput').value = '';
+      document.getElementById('activeModelInput').value = '';
+      renderModelChips();
     });
 
     document.getElementById('btnToggleApiKey').addEventListener('click', () => {
@@ -1570,6 +1534,7 @@ export class DashboardPanel {
         currentProviderModels.unshift(defaultModel);
       }
 
+      pendingProviderSave = true;
       vscode.postMessage({
         type: 'saveProvider',
         payload: {
@@ -1698,6 +1663,25 @@ export class DashboardPanel {
       }, 2800);
     }
 
+    function isProviderFormDirty() {
+      if (!editingProviderId) return true;
+      const saved = appState.providers.find((p) => p.id === editingProviderId);
+      if (!saved) return true;
+      const name = document.getElementById('providerNameInput').value.trim();
+      const baseUrl = document.getElementById('providerBaseUrlInput').value.trim();
+      const apiKey = document.getElementById('providerApiKeyInput').value.trim();
+      if (name !== (saved.name || '')) return true;
+      if (selectedProtocol !== (saved.protocol || 'openai-responses')) return true;
+      if (baseUrl !== (saved.baseUrl || '')) return true;
+      if (apiKey !== (saved.apiKey || '')) return true;
+      const savedModels = Array.isArray(saved.models) ? saved.models : [];
+      if (currentProviderModels.length !== savedModels.length) return true;
+      for (let i = 0; i < currentProviderModels.length; i++) {
+        if (currentProviderModels[i] !== savedModels[i]) return true;
+      }
+      return false;
+    }
+
     function loadProviderIntoForm(p) {
       hideBanner();
       editingProviderId = p.id || '';
@@ -1707,11 +1691,19 @@ export class DashboardPanel {
       document.getElementById('providerApiKeyInput').value = p.apiKey || '';
       selectedProtocol = p.protocol || 'openai-responses';
       currentProviderModels = Array.isArray(p.models) ? [...p.models] : [];
+      modelSearchKeyword = '';
+      document.getElementById('modelSearchInput').value = '';
 
-      const activeModel =
-        (p.id && p.id === appState.preferences.activeProviderId && appState.preferences.activeModelId)
-          ? appState.preferences.activeModelId
-          : (p.defaultModel || currentProviderModels[0] || '');
+      const prefActiveModel = appState.preferences.activeModelId;
+      const canUsePrefModel =
+        p.id &&
+        p.id === appState.preferences.activeProviderId &&
+        prefActiveModel &&
+        (currentProviderModels.length === 0 || currentProviderModels.includes(prefActiveModel));
+
+      const activeModel = canUsePrefModel
+        ? prefActiveModel
+        : (p.defaultModel || currentProviderModels[0] || '');
       document.getElementById('activeModelInput').value = activeModel;
 
       document.querySelectorAll('.protocol-card').forEach((c) => {
@@ -1725,6 +1717,7 @@ export class DashboardPanel {
         ? (isZh ? '编辑模式' : 'Editing')
         : (isZh ? '新建模式' : 'New');
       document.getElementById('btnDeleteProvider').style.display = editingProviderId ? 'inline-flex' : 'none';
+      document.getElementById('btnNewProvider').style.display = editingProviderId ? 'inline-flex' : 'none';
 
       updateEndpointPreview();
       renderProviderList();
@@ -1741,7 +1734,12 @@ export class DashboardPanel {
       const langTag = appState.resolvedCommitLanguage === 'zh' ? '中文' : 'EN';
 
       if (activeProvider) {
-        const modelName = prefs.activeModelId || activeProvider.defaultModel || activeProvider.models[0] || (isZh ? '未选模型' : 'No model');
+        const validPrefModel =
+          prefs.activeModelId &&
+          (!activeProvider.models || activeProvider.models.length === 0 || activeProvider.models.includes(prefs.activeModelId))
+            ? prefs.activeModelId
+            : '';
+        const modelName = validPrefModel || activeProvider.defaultModel || activeProvider.models[0] || (isZh ? '未选模型' : 'No model');
         const tplName = activeTemplate ? activeTemplate.name.split(' (')[0] : 'Conventional';
         dot.className = 'summary-dot';
         const summaryStr = modelName + ' · ' + tplName + ' (' + langTag + ')';
@@ -1768,8 +1766,8 @@ export class DashboardPanel {
         empty.style.fontSize = '11.5px';
         empty.style.padding = '8px 2px';
         empty.textContent = isZh
-          ? '暂无供应商，点击上方预设或右侧添加。'
-          : 'No providers yet. Click a preset above or use the form.';
+          ? '暂无已配置的供应商，请在右侧填写并保存。'
+          : 'No providers configured yet. Add one using the form on the right.';
         container.appendChild(empty);
         return;
       }
@@ -1814,9 +1812,14 @@ export class DashboardPanel {
 
         const meta = document.createElement('div');
         meta.className = 'provider-item-meta';
+        const prefModel =
+          appState.preferences.activeModelId &&
+          (!p.models || p.models.length === 0 || p.models.includes(appState.preferences.activeModelId))
+            ? appState.preferences.activeModelId
+            : '';
         const modelText = isCurrentActive
-          ? (appState.preferences.activeModelId || p.defaultModel || '-')
-          : (p.defaultModel || p.models[0] || '-');
+          ? (prefModel || p.defaultModel || (p.models && p.models[0]) || '-')
+          : (p.defaultModel || (p.models && p.models[0]) || '-');
         meta.innerHTML = '<span><strong>' + escapeHtml(modelText) + '</strong> (' + (p.models ? p.models.length : 0) + ')</span>' +
                          '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(p.baseUrl) + '</span>';
         item.appendChild(meta);
@@ -1832,6 +1835,10 @@ export class DashboardPanel {
     function renderModelChips() {
       const container = document.getElementById('modelsChipsContainer');
       const currentInputVal = document.getElementById('activeModelInput').value.trim();
+      const clearBtn = document.getElementById('btnClearModels');
+      if (clearBtn) {
+        clearBtn.style.display = currentProviderModels.length > 0 ? 'inline-flex' : 'none';
+      }
       container.innerHTML = '';
 
       const filtered = currentProviderModels.filter((m) =>
@@ -1864,6 +1871,10 @@ export class DashboardPanel {
         del.addEventListener('click', (e) => {
           e.stopPropagation();
           currentProviderModels = currentProviderModels.filter((item) => item !== modelId);
+          const activeInp = document.getElementById('activeModelInput');
+          if (activeInp.value.trim() === modelId) {
+            activeInp.value = currentProviderModels[0] || '';
+          }
           renderModelChips();
         });
         chip.appendChild(del);
@@ -1871,7 +1882,7 @@ export class DashboardPanel {
         chip.addEventListener('click', () => {
           document.getElementById('activeModelInput').value = modelId;
           renderModelChips();
-          if (editingProviderId) {
+          if (editingProviderId && !isProviderFormDirty()) {
             vscode.postMessage({
               type: 'setActiveProviderModel',
               payload: { providerId: editingProviderId, modelId }
@@ -2051,22 +2062,48 @@ export class DashboardPanel {
           renderTemplatesGrid();
           renderPreferences();
 
-          const existing = appState.providers.find((p) => p.id === editingProviderId);
-          if (existing) {
-            loadProviderIntoForm(existing);
-          } else if (appState.providers.length > 0) {
-            const active =
-              appState.providers.find((p) => p.id === appState.preferences.activeProviderId) ||
-              appState.providers[0];
-            loadProviderIntoForm(active);
-          } else if (!document.getElementById('providerNameInput').value) {
-            document.getElementById('btnPresetOpenAI').click();
+          if (pendingProviderSave) {
+            break;
+          }
+
+          if (!hasInitializedForm) {
+            hasInitializedForm = true;
+            if (appState.providers.length > 0) {
+              const active =
+                appState.providers.find((p) => p.id === appState.preferences.activeProviderId) ||
+                appState.providers[0];
+              loadProviderIntoForm(active);
+            } else {
+              resetNewProviderForm();
+            }
+            break;
+          }
+
+          if (editingProviderId) {
+            const existing = appState.providers.find((p) => p.id === editingProviderId);
+            if (!existing) {
+              if (appState.providers.length > 0) {
+                const active =
+                  appState.providers.find((p) => p.id === appState.preferences.activeProviderId) ||
+                  appState.providers[0];
+                loadProviderIntoForm(active);
+              } else {
+                resetNewProviderForm();
+              }
+            } else if (!isProviderFormDirty()) {
+              loadProviderIntoForm(existing);
+            }
           }
           break;
         }
 
         case 'providerSaved': {
+          pendingProviderSave = false;
           editingProviderId = msg.providerId;
+          const saved = appState.providers.find((p) => p.id === msg.providerId);
+          if (saved) {
+            loadProviderIntoForm(saved);
+          }
           showBanner('success', '✓ ' + msg.message);
           showToast(msg.message);
           break;
@@ -2087,19 +2124,42 @@ export class DashboardPanel {
           btn.textContent = '🔄 ' + (isZh ? '自动获取模型列表 (/v1/models)' : 'Fetch Models (/v1/models)');
 
           if (msg.ok) {
-            const fetchedIds = (msg.models || []).map((m) => m.id);
-            const merged = Array.from(new Set([...fetchedIds, ...currentProviderModels]));
-            currentProviderModels = merged;
-            if (!document.getElementById('activeModelInput').value.trim() && fetchedIds.length > 0) {
-              document.getElementById('activeModelInput').value = fetchedIds[0];
+            const fetchedIds = Array.from(
+              new Set(
+                (msg.models || [])
+                  .map((m) => (m && m.id ? String(m.id).trim() : ''))
+                  .filter(Boolean)
+              )
+            );
+            // 用最新获取的模型列表完全替换旧模型列表，避免残留旧配置下的模型
+            currentProviderModels = fetchedIds;
+            modelSearchKeyword = '';
+            document.getElementById('modelSearchInput').value = '';
+
+            const activeInput = document.getElementById('activeModelInput');
+            const prevModel = activeInput.value.trim();
+            if (fetchedIds.length === 0) {
+              activeInput.value = '';
+            } else if (!prevModel || !fetchedIds.includes(prevModel)) {
+              activeInput.value = fetchedIds[0];
             }
             renderModelChips();
-            showBanner(
-              'success',
-              isZh
-                ? ('✓ 成功获取到 ' + fetchedIds.length + ' 个模型，点击下方标签即可选用。')
-                : ('✓ Fetched ' + fetchedIds.length + ' models from ' + msg.endpoint)
-            );
+
+            if (fetchedIds.length > 0) {
+              showBanner(
+                'success',
+                isZh
+                  ? ('✓ 成功获取到 ' + fetchedIds.length + ' 个模型（已替换旧模型列表），点击下方标签即可选用。')
+                  : ('✓ Fetched ' + fetchedIds.length + ' models from ' + msg.endpoint + ' (previous models cleared).')
+              );
+            } else {
+              showBanner(
+                'error',
+                isZh
+                  ? '接口返回了 0 个可用模型，请直接手动输入模型 ID。'
+                  : 'Endpoint returned 0 models. Please enter a model ID manually.'
+              );
+            }
           } else {
             showBanner('error', '✗ ' + (msg.error || 'Failed to fetch models'));
           }
@@ -2139,6 +2199,9 @@ export class DashboardPanel {
         }
 
         case 'toast': {
+          if (msg.level === 'error') {
+            pendingProviderSave = false;
+          }
           showToast(msg.message);
           break;
         }

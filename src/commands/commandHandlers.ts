@@ -476,12 +476,18 @@ export class CommandHandlers {
         );
 
         if (fetched.models.length > 0) {
-          const fetchedIds = fetched.models.map((m) => m.id);
-          models = Array.from(new Set([...fetchedIds, ...models]));
+          const fetchedIds = Array.from(
+            new Set(fetched.models.map((m) => m.id.trim()).filter(Boolean))
+          );
+          models = fetchedIds;
+          const nextDefault =
+            provider.defaultModel && models.includes(provider.defaultModel)
+              ? provider.defaultModel
+              : models[0];
           await this.configManager.upsertProvider({
             ...provider,
             models,
-            defaultModel: provider.defaultModel || models[0]
+            defaultModel: nextDefault
           });
         }
       } catch (err: any) {

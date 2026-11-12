@@ -171,14 +171,29 @@ export class ConfigManager {
 
     const prefs = this.getPreferences();
     if (setAsActive || !prefs.activeProviderId || providers.length === 1) {
+      const nextActiveModel =
+        defaultModel ||
+        (prefs.activeProviderId === id && models.includes(prefs.activeModelId)
+          ? prefs.activeModelId
+          : '');
       await this.updatePreferences({
         activeProviderId: id,
-        activeModelId: defaultModel || prefs.activeModelId
+        activeModelId: nextActiveModel
       });
-    } else if (prefs.activeProviderId === id && defaultModel && !prefs.activeModelId) {
-      await this.updatePreferences({
-        activeModelId: defaultModel
-      });
+    } else if (prefs.activeProviderId === id) {
+      if (defaultModel && defaultModel !== prefs.activeModelId) {
+        await this.updatePreferences({
+          activeModelId: defaultModel
+        });
+      } else if (models.length === 0 && prefs.activeModelId) {
+        await this.updatePreferences({
+          activeModelId: ''
+        });
+      } else if (models.length > 0 && !models.includes(prefs.activeModelId)) {
+        await this.updatePreferences({
+          activeModelId: defaultModel || models[0]
+        });
+      }
     }
 
     this._onDidChange.fire();
@@ -219,8 +234,15 @@ export class ConfigManager {
       provider = providers[0];
     }
 
+    const validActiveModel =
+      provider &&
+      prefs.activeModelId &&
+      (provider.models.length === 0 || provider.models.includes(prefs.activeModelId))
+        ? prefs.activeModelId
+        : '';
+
     const modelId =
-      prefs.activeModelId ||
+      validActiveModel ||
       provider?.defaultModel ||
       provider?.models[0] ||
       '';
